@@ -1,0 +1,60 @@
+trigger:
+  branches:
+    include:
+    - refs/heads/main
+
+name: $(date:yyyyMMdd)$(rev:.rr)
+
+jobs:
+- job: Phase_1
+  displayName: Build Push Image
+  cancelTimeoutInMinutes: 1
+  pool:
+    vmImage: ubuntu-20.04
+  steps:
+  - checkout: self
+
+  - task: SonarQubePrepare@4
+    displayName: Prepare analysis on SonarQube
+    inputs:
+      SonarQube: xxxxxxxx-xxxxxxx-xxxxxxxx-xxxxxxxx
+      projectKey: Api.Elasticsearch
+      projectName: Api.Elasticsearch
+      extraProperties: "# Additional properties that will be passed to the scanner, \n# Put one key=value per line, example:\n# sonar.exclusions=**/*.bin\nsonar.cs.opencover.reportsPaths=\"$(Agent.TempDirectory)/coverage.opencover.xml\""
+
+  - task: DotNetCoreCLI@2
+    displayName: dotnet custom
+    inputs:
+      command: custom
+      custom: tool
+      arguments: install --tool-path . dotnet-reportgenerator-globaltool
+
+  - task: DotNetCoreCLI@2
+    displayName: dotnet build
+    inputs:
+      projects: '**/*.csproj'
+      arguments: --configuration $(buildConfiguration)
+
+  - task: DotNetCoreCLI@2
+    displayName: dotnet test
+    continueOnError: True
+    inputs:
+      command: test
+      projects: '**/Sample.Elasticsearch.UnitTest.csproj'
+      arguments: --configuration $(buildConfiguration) /p:CollectCoverage=true /p:CoverletOutput=$(Agent.TempDirectory)/ /p:CoverletOutputFormat=opencover
+
+  - task: PublishTestResults@2
+    displayName: Publish Test Results /home/vsts/work/_temp/*.trx
+    enabled: False
+    inputs:
+      testRunner: VSTest
+      testResultsFiles: /home/vsts/work/_temp/*.trx
+      mergeTestResults: true
+      failTaskOnFailedTests: true
+
+  - task: SonarQubeAnalyze@4
+    displayName: Run Code Analysis
+
+  - task: SonarQubePublish@4
+    displayName: Publish Quality Gate Result
+...

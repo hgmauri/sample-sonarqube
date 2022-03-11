@@ -1,0 +1,37 @@
+# ASP.NET Core
+
+trigger:
+- none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  buildConfiguration: 'Release'
+
+steps:
+  - task: UseDotNet@2
+    inputs:
+      packageType: 'sdk'
+      version: '6.x' 
+           
+  - task: DotNetCoreCLI@2
+    displayName: build
+    inputs:
+      command: 'build'
+      projects: '**/*.csproj'
+      
+  - task: DotNetCoreCLI@2
+    displayName: run tests
+    inputs:
+      command: 'test'
+      projects: '**/Sample.Elasticsearch.UnitTest.csproj'
+      arguments: '--configuration $(buildConfiguration) --collect:"XPlat Code Coverage"'
+      publishTestResults: true
+
+
+  - task: PublishCodeCoverageResults@1
+    displayName: 'Publish code coverage'
+    inputs:
+      codeCoverageTool: Cobertura
+      summaryFileLocation: '$(Agent.TempDirectory)/**/coverage.cobertura.xml'
